@@ -12,7 +12,7 @@ from parsers.utils import extract_text_pdfplumber, is_pdf_valid, is_valid_bcbp
 class BoardingPassParser(ABC):
     def __init__(self):
         self._raw_data = None
-        self.bp_details = ParsedBoardingPass(airline_code=self.airline_code)
+        self.bp_details = ParsedBoardingPass(operator_code=self.airline_code)
 
     @property
     def raw_data(self):

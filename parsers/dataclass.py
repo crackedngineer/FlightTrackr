@@ -13,7 +13,6 @@ class ParsedBoardingPass:
     passenger_firstname: Optional[str] = None
     passenger_lastname: Optional[str] = None
     operator_code: Optional[str] = None
-    airline_code: Optional[str] = None
     flight_number: Optional[str] = None
     origin: Optional[str] = None
     destination: Optional[str] = None
