@@ -9,3 +9,13 @@ class AirlinesEnum(Enum):
     VISTARA = "Vistara"
     AKASA_AIR = "Akasa Air"
     ALLIANCE_AIR = "Alliance Air"
+
+class AirlineCodeEnum(Enum):
+    INDIGO = "6E"
+    AIR_INDIA = "AI"
+    AIR_INDIA_EXPRESS = "IX"
+    AIR_ASIA = "I5"
+    SPICEJET = "SG"
+    VISTARA = "UK"
+    AKASA_AIR = "RK"
+    ALLIANCE_AIR = "9I"

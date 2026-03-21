@@ -9,6 +9,6 @@ class AkasaParser(BoardingPassParser):
     def _can_handle(self, raw_data: str) -> bool:
         return True
     
-    def _parse_content(self, raw_data: str) -> ParsedBoardingPass:
-        self.bp_details.operator_code = self.airline_code
-        return self.bp_details
+    def _parse_content(self, raw_data: str, bp_obj: ParsedBoardingPass) -> ParsedBoardingPass:
+        bp_obj.operator_code = self.airline_code
+        return bp_obj

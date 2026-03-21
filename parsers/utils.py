@@ -1,5 +1,8 @@
-from pathlib import Path
+import zxingcpp
 import pdfplumber
+import numpy as np
+from PIL import Image
+from io import BytesIO
 
 
 def is_valid_bcbp(data: str) -> bool:
@@ -8,12 +11,11 @@ def is_valid_bcbp(data: str) -> bool:
     return True
 
 
-def is_pdf_valid(pdf_path: Path) -> bool:
-    with pdfplumber.open(pdf_path) as pdf:
-        text = "".join(page.extract_text() or "" for page in pdf.pages)
-        return len(text.strip()) >= 50
-
-
-def extract_text_pdfplumber(pdf_path: Path) -> str:
-    with pdfplumber.open(pdf_path) as pdf:
+def extract_text_pdfplumber(pdf_bytes: bytes) -> str:
+    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         return "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+def decode_bcbp(image: Image.Image) -> list[str]:
+    img_np = np.array(image)
+    results = zxingcpp.read_barcodes(img_np)
+    return [r.text.strip() for r in results if r.text]
