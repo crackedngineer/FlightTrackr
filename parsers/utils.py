@@ -10,7 +10,6 @@ def is_valid_bcbp(data: str) -> bool:
         return False
     return True
 
-
 def extract_text_pdfplumber(pdf_bytes: bytes) -> str:
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         return "\n".join(page.extract_text() or "" for page in pdf.pages)

@@ -5,6 +5,11 @@ from datetime import datetime
 
 from parsers.utils import decode_bcbp, is_valid_bcbp
 
+
+###########
+# Note := Add Support for multiple connecting flights. Currently only supports single flight boarding passes.
+###########
+
 def extract_bcbp_barcode(pdf_bytes: bytes) -> str:
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
         for page_number, page in enumerate(pdf.pages, start=1):
