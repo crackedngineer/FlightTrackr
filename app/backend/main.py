@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routes.v1.routes import routers as v1_routers
+from routes.v1.routes import routers as v1_routers
 
 app = FastAPI(
     title="FlightTracr API",

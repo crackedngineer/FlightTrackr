@@ -1,4 +1,4 @@
-from backend.core.settings import get_settings
+from core.settings import get_settings
 
 settings = get_settings()
 

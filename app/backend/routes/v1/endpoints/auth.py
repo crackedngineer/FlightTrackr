@@ -1,13 +1,11 @@
 from fastapi import APIRouter
+from services.google_oauth import GoogleOAuthService
 # from app.core.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/auth",
     tags=["core"],
 )
-
-from fastapi import APIRouter, Depends
-from backend.services.google_oauth import GoogleOAuthService
 
 router = APIRouter()
 

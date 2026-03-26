@@ -1,3 +1,5 @@
+from typing import Optional
+
 from anyio.functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,9 +9,9 @@ class Settings(BaseSettings):
     Application settings loaded from environment variables or .env file.
     """
 
-    gooogle_client_id: str
-    google_redirect_uri: str
-    google_client_secret: str
+    gooogle_client_id: Optional[str] = None
+    google_redirect_uri: Optional[str] = None
+    google_client_secret: Optional[str] = None
 
     supabase_url: str
     supabase_key: str
@@ -26,4 +28,4 @@ def get_settings():
     Creates a cached instance of the settings.
     Using lru_cache ensures the .env isn't re-read on every request.
     """
-    return Settings(**{})
+    return Settings()
