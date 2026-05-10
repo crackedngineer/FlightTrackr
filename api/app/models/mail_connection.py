@@ -2,10 +2,10 @@ import uuid
 from sqlalchemy import String, Text, DateTime, func, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from app.db.base import Base
+from app.db.base import Base, TimestampMixin
 
 
-class UserMailConnection(Base):
+class UserMailConnection(Base, TimestampMixin):
     __tablename__ = "user_mail_connections"
     __table_args__ = (
         UniqueConstraint("user_id", "provider", "provider_email", name="uq_mail_connections_user_provider_email"),
@@ -24,5 +24,3 @@ class UserMailConnection(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="active")
     connected_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_synced_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

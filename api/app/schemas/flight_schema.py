@@ -29,7 +29,7 @@ class BoardingPassResponse(BaseModel):
     barcode: str
 
 
-class FlightSegmentResponse(BaseModel):
+class FlightResponse(BaseModel):
     id: str
     flight_number: str
     airline: AirlineInfo
@@ -43,7 +43,7 @@ class FlightSegmentResponse(BaseModel):
     boarding_passes: list[BoardingPassResponse]
 
 
-class TripResponse(BaseModel):
+class BookingResponse(BaseModel):
     id: str
     pnr_code: str
     trip_type: str
@@ -51,10 +51,10 @@ class TripResponse(BaseModel):
     end_date: Optional[str] = None
     airline: AirlineInfo
     source: str
-    flights: list[FlightSegmentResponse]
+    flights: list[FlightResponse]
 
     @classmethod
-    def from_orm(cls, trip) -> "TripResponse":
+    def from_orm(cls, trip) -> "BookingResponse":
         def fmt(dt) -> Optional[str]:
             if dt is None:
                 return None
@@ -75,7 +75,7 @@ class TripResponse(BaseModel):
                     boarding_group=bp.boarding_group,
                     barcode=bp.barcode or "",
                 ))
-            segments.append(FlightSegmentResponse(
+            segments.append(FlightResponse(
                 id=str(f.id),
                 flight_number=f.flight_number,
                 airline=AirlineInfo(
@@ -115,6 +115,6 @@ class TripResponse(BaseModel):
         )
 
 
-class TripsListResponse(BaseModel):
-    trips: list[TripResponse]
+class BookingsListResponse(BaseModel):
+    bookings: list[BookingResponse]
     total: int

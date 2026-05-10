@@ -5,7 +5,8 @@ from googleapiclient.errors import HttpError
 from app.tasks.celery_app import celery_app
 from app.db.session import SyncSessionLocal
 from app.models.gmail_sync_job import GmailSyncJob
-from app.services.oauth_token_service import get_token_sync, decrypt_token
+from app.services.mail_token_service import load_connection_sync
+from app.mail.gmail import GmailProvider
 from app.services.gmail_service import GmailService
 from app.services.flight_service import (
     _parse_departure_to_datetime,
@@ -47,12 +48,11 @@ def sync_gmail_boarding_passes(self: Task, user_id: str, job_id: str) -> dict:
         session.commit()
 
         try:
-            token_record = get_token_sync(session, user_id)
-            if not token_record:
-                raise ValueError("No OAuth token found — user must re-authenticate")
+            creds = load_connection_sync(session, user_id, "gmail")
+            if not creds.refresh_token:
+                raise ValueError("No Gmail refresh token found — user must re-authenticate")
 
-            refresh_token = decrypt_token(token_record.refresh_token)
-            gmail = GmailService(refresh_token)
+            gmail = GmailService(creds.refresh_token)
 
             message_ids = gmail.search_messages(
                 query=settings.gmail_search_query,

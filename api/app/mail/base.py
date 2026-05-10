@@ -65,6 +65,9 @@ class MailProvider(ABC):
     async def refresh_credentials(self, creds: MailCredentials) -> MailCredentials:
         return creds
 
+    def refresh_credentials_sync(self, creds: MailCredentials) -> MailCredentials:
+        raise NotImplementedError(f"{self.provider_name} does not implement sync token refresh")
+
     @abstractmethod
     async def validate_credentials(self, creds: MailCredentials) -> bool:
         ...

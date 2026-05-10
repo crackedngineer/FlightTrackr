@@ -123,7 +123,7 @@ class Passenger(Base, TimestampMixin):
     )
 
 
-class BoardingPass(Base):
+class BoardingPass(Base, TimestampMixin):
     __tablename__ = "boarding_passes"
     __table_args__ = (
         UniqueConstraint(

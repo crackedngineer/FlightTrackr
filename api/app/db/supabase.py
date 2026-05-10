@@ -12,5 +12,5 @@ def get_supabase_client() -> Client:
     return create_client(
         settings.supabase_url,
         settings.supabase_key,
-        # options=SyncClientOptions(flow_type="implicit"),
+        options=SyncClientOptions(flow_type="implicit"),
     )

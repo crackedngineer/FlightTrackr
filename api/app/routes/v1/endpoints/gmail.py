@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user, get_db_session
-from app.services.oauth_token_service import get_token
+from app.services import mail_token_service
 from app.models.gmail_sync_job import GmailSyncJob
 from app.tasks.gmail_sync import sync_gmail_boarding_passes
 from app.schemas.gmail_schema import GmailSyncEnqueueResponse, GmailSyncStatusResponse
@@ -18,9 +18,9 @@ async def start_gmail_sync(
     user_id: str = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> GmailSyncEnqueueResponse:
-    # Verify token exists before creating a job
-    token = await get_token(session, user_id)
-    if not token:
+    # Verify a Gmail connection exists before creating a job
+    connections = await mail_token_service.list_connections(session, user_id)
+    if not any(c.provider == "gmail" for c in connections):
         raise HTTPException(
             status_code=400,
             detail="Google account not connected. Please re-authenticate to grant Gmail access.",

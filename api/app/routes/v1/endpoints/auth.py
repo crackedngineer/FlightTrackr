@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from typing import Dict, Any, Optional
 from urllib.parse import urlencode
 
@@ -12,7 +12,8 @@ from app.core.settings import get_settings, Settings
 from app.core.dependencies import get_auth_service, get_current_user, get_db_session
 import uuid as _uuid
 from app.services.auth_service import AuthService
-from app.services.oauth_token_service import upsert_token, get_token
+from app.services import mail_token_service
+from app.mail.base import MailCredentials
 from app.models.gmail_sync_job import GmailSyncJob
 from app.tasks.gmail_sync import sync_gmail_boarding_passes
 
@@ -64,6 +65,7 @@ class GoogleSignInResponse(BaseModel):
 class GoogleTokenRequest(BaseModel):
     google_refresh_token: str
     google_access_token: Optional[str] = None
+    provider_email: str = ""
 
 
 class UserResponse(BaseModel):
@@ -79,6 +81,7 @@ class TokenRefreshRequest(BaseModel):
 
 class CallbackRequest(BaseModel):
     code: str
+    state: str
 
 
 @router.post(
@@ -89,22 +92,12 @@ async def google_signin(
     auth_service: AuthService = Depends(get_auth_service),
 ) -> GoogleSignInResponse:
     data = await auth_service.authenticate_with_google()
-    # ✅ Store verifier in secure cookie
-    response.set_cookie(
-        key=PKCE_COOKIE_NAME,
-        value=str(data["code_verifier"]),
-        httponly=True,
-        secure=False,  # ⚠️ set True in production (HTTPS)
-        samesite="lax",
-        max_age=PKCE_MAX_AGE,
-    )
     return GoogleSignInResponse(url=data["url"])
 
 
 @router.post("/callback", summary="OAuth callback — sets HttpOnly session cookies")
 async def auth_callback(
     body: CallbackRequest,
-    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db_session),
     auth_service: AuthService = Depends(get_auth_service),
@@ -112,16 +105,9 @@ async def auth_callback(
 ):
     settings = get_settings()
     try:
-        code_verifier = request.cookies.get("pkce_verifier")
-        if not code_verifier:
-            raise HTTPException(400, "Missing PKCE verifier cookie")
-
-        result = auth_service.exchange_code_for_session(
-            body.code, str(settings.google_redirect_uri), code_verifier
+        result = await auth_service.exchange_code_for_session(
+            body.code, str(settings.google_redirect_uri), state=body.state
         )
-
-        # cleanup cookie
-        response.delete_cookie("pkce_verifier")
     except Exception as exc:
         logger.error("Code exchange failed: %s", exc)
         raise HTTPException(status_code=400, detail="OAuth code exchange failed")
@@ -130,39 +116,42 @@ async def auth_callback(
     user = result.user
     _set_auth_cookies(response, session)
 
-    # Store Google tokens for Gmail sync
     if not user or not user.id:
         raise HTTPException(
             status_code=400, detail="User ID not found in token exchange result"
         )
 
-    try:
-        refresh_tok, access_tok = auth_service.get_google_tokens(
-            str(settings.supabase_url),
-            str(settings.supabase_service_role_key),
-            str(user.id),
-        )
-        existing = await get_token(db, str(user.id))
-        is_first = existing is None
-        await upsert_token(
-            session=db,
-            user_id=str(user.id),
-            refresh_token=refresh_tok,
-            access_token=access_tok,
-            scope="https://www.googleapis.com/auth/gmail.readonly",
-        )
-        if is_first:
-            job = GmailSyncJob(user_id=_uuid.UUID(str(user.id)), status="pending")
-            db.add(job)
-            await db.flush()
-            task = sync_gmail_boarding_passes.delay(str(user.id), str(job.id))
-            job.celery_task_id = task.id
-            logger.info(
-                "First Google connect — auto-sync job=%s user=%s", job.id, user.id
-            )
-        await db.commit()
-    except Exception as exc:
-        logger.warning("Could not store Google tokens: %s", exc)
+    # try:
+    #     if session is not None:
+    #         refresh_token, access_token = auth_service.get_google_tokens(session)
+    #         provider_email = user.email or ""
+    #         connections = await mail_token_service.list_connections(db, str(user.id))
+    #         is_first = not any(c.provider == "gmail" for c in connections)
+
+    #         gmail_creds = MailCredentials(
+    #             provider_email=provider_email,
+    #             access_token=access_token,
+    #             refresh_token=refresh_token,
+    #             scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+    #         )
+    #         await mail_token_service.store_connection(
+    #             db, str(user.id), "gmail", gmail_creds
+    #         )
+
+    #         if is_first:
+    #             job = GmailSyncJob(user_id=_uuid.UUID(str(user.id)), status="pending")
+    #             db.add(job)
+    #             await db.flush()
+    #             task = sync_gmail_boarding_passes.delay(str(user.id), str(job.id))
+    #             job.celery_task_id = task.id
+    #             logger.info(
+    #                 "First Google connect — auto-sync job=%s user=%s", job.id, user.id
+    #             )
+    #         await db.commit()
+    #     else:
+    #         logger.warning("Session is None, skipping Google token storage")
+    # except Exception as exc:
+    #     logger.warning("Could not store Google tokens: %s", exc)
 
     return {"success": True, "user_id": str(user.id)}
 
@@ -220,17 +209,16 @@ async def store_google_token(
     user_id: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
-    # Detect first-time Google connection before upserting
-    existing = await get_token(db, user_id)
-    is_first = existing is None
+    connections = await mail_token_service.list_connections(db, user_id)
+    is_first = not any(c.provider == "gmail" for c in connections)
 
-    await upsert_token(
-        session=db,
-        user_id=user_id,
-        refresh_token=request.google_refresh_token,
+    gmail_creds = MailCredentials(
+        provider_email=request.provider_email,
         access_token=request.google_access_token,
-        scope="https://www.googleapis.com/auth/gmail.readonly",
+        refresh_token=request.google_refresh_token,
+        scopes=["https://www.googleapis.com/auth/gmail.readonly"],
     )
+    await mail_token_service.store_connection(db, user_id, "gmail", gmail_creds)
 
     if is_first:
         job = GmailSyncJob(user_id=_uuid.UUID(user_id), status="pending")

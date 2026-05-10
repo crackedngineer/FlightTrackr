@@ -35,9 +35,10 @@ export default function CallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { code, oauthError, oauthErrDesc } = useMemo(() => {
+  const { code, state, oauthError, oauthErrDesc } = useMemo(() => {
     return {
       code: searchParams.get("code"),
+      state: searchParams.get("state"),
       oauthError: searchParams.get("error"),
       oauthErrDesc: searchParams.get("error_description"),
     };
@@ -66,7 +67,7 @@ export default function CallbackPage() {
 
     const handleAuth = async () => {
       try {
-        await callback(code!); // ⬅️ WAITS FULLY (no timeout interference)
+        await callback(code!, state!); // ⬅️ WAITS FULLY (no timeout interference)
 
         if (!isMounted) return;
 

@@ -21,8 +21,8 @@ export async function storeGoogleToken(
   });
 }
 
-export async function callback(code: string): Promise<void> {
-  await httpClient.post("/auth/callback", { code }, { includeAuth: false });
+export async function callback(code: string, state: string): Promise<void> {
+  await httpClient.post("/auth/callback", { code, state }, { includeAuth: false });
 }
 
 export async function exchangeCode(code: string, state: string): Promise<void> {

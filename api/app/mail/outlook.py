@@ -79,6 +79,25 @@ class OutlookProvider(MailProvider):
         creds.expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
         return creds
 
+    def refresh_credentials_sync(self, creds: MailCredentials) -> MailCredentials:
+        if not creds.refresh_token:
+            raise ValueError("No refresh token available")
+        with httpx.Client() as client:
+            resp = client.post(_TOKEN_URL, data={
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "refresh_token": creds.refresh_token,
+                "grant_type": "refresh_token",
+                "scope": _SCOPES,
+            })
+            resp.raise_for_status()
+            data = resp.json()
+        creds.access_token = data["access_token"]
+        if "refresh_token" in data:
+            creds.refresh_token = data["refresh_token"]
+        creds.expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
+        return creds
+
     async def validate_credentials(self, creds: MailCredentials) -> bool:
         try:
             await self._get_user_info(creds.access_token)
