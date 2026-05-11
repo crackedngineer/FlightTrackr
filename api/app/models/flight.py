@@ -31,7 +31,7 @@ class Booking(Base, TimestampMixin):
     pnr_code = mapped_column(String(20), nullable=False, index=True)
     source = mapped_column(String(20), nullable=False, default="gmail")
     document_url = mapped_column(String(500), nullable=True)
-    airline_id: Mapped[int] = mapped_column(ForeignKey("airlines.id"), nullable=False)
+    airline_id: Mapped[int] = mapped_column(ForeignKey("public.airlines.id"), nullable=False)
     booking_type = mapped_column(String(20), nullable=False, default="direct")
     start_date = mapped_column(Date, nullable=True)
     end_date = mapped_column(Date, nullable=True)
@@ -70,15 +70,15 @@ class Flight(Base, TimestampMixin):
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     booking_id = mapped_column(
-        UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("public.bookings.id"), nullable=False
     )
     flight_number = mapped_column(String(20), nullable=False)
-    airline_id: Mapped[int] = mapped_column(ForeignKey("airlines.id"), nullable=False)
+    airline_id: Mapped[int] = mapped_column(ForeignKey("public.airlines.id"), nullable=False)
     departure_airport = mapped_column(
-        UUID(as_uuid=True), ForeignKey("airports.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("public.airports.id"), nullable=False
     )
     arrival_airport = mapped_column(
-        UUID(as_uuid=True), ForeignKey("airports.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("public.airports.id"), nullable=False
     )
     departure_time = mapped_column(DateTime(timezone=True), nullable=False)
     arrival_time = mapped_column(DateTime(timezone=True), nullable=True)
@@ -112,7 +112,7 @@ class Passenger(Base, TimestampMixin):
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     booking_id = mapped_column(
-        UUID(as_uuid=True), ForeignKey("bookings.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("public.bookings.id"), nullable=False, index=True
     )
     first_name = mapped_column(String(100), nullable=False)
     last_name = mapped_column(String(100), nullable=False)
@@ -135,10 +135,10 @@ class BoardingPass(Base, TimestampMixin):
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     flight_id = mapped_column(
-        UUID(as_uuid=True), ForeignKey("flights.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("public.flights.id"), nullable=False, index=True
     )
     passenger_id = mapped_column(
-        UUID(as_uuid=True), ForeignKey("passengers.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("public.passengers.id"), nullable=False, index=True
     )
     barcode = mapped_column(String(500), nullable=False)
     seat_number = mapped_column(String(10))

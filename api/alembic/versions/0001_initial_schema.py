@@ -28,7 +28,6 @@ def upgrade() -> None:
         sa.Column("active", sa.Boolean, nullable=False, server_default=sa.true()),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.UniqueConstraint("iata_code", name="uq_airlines_iata_code"),
         sa.UniqueConstraint("icao_code", name="uq_airlines_icao_code"),
         schema="public",
     )
@@ -47,7 +46,6 @@ def upgrade() -> None:
         sa.Column("timezone", sa.String(50), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.UniqueConstraint("iata_code", name="uq_airports_iata_code"),
         sa.UniqueConstraint("icao_code", name="uq_airports_icao_code"),
         schema="public",
     )
