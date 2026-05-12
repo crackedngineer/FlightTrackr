@@ -112,3 +112,7 @@ services:
 volumes:
   postgres_data:
   tailscale_data: # Persists Tailscale ID so it doesn't create a new node on every restart
+
+networks:
+  boarding-pass-parser_app:
+    external: false
