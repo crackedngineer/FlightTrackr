@@ -70,10 +70,6 @@ services:
     depends_on:
       tailscale:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     restart: unless-stopped
 
   web:
@@ -112,11 +108,6 @@ services:
       CELERY_BROKER_URL: redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
       CELERY_RESULT_BACKEND: redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/1
     command: uv run celery -A app.tasks.celery_app worker --loglevel=info --pool=prefork
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
 volumes:
   postgres_data:
