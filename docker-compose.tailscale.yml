@@ -93,8 +93,8 @@ services:
     env_file:
       - ./web.env
     environment:
-      NEXT_PUBLIC_API_BASE_URL: https://flighttrackr-api.tailcda03.ts.net/api/v1
-      NEXT_PUBLIC_API_URL: https://flighttrackr-api.tailcda03.ts.net/api/v1
+      NEXT_PUBLIC_API_BASE_URL: https://flighttrackr.tailcda03.ts.net/api/v1
+      NEXT_PUBLIC_API_URL: https://flighttrackr.tailcda03.ts.net/api/v1
     depends_on:
       - api
     restart: unless-stopped
