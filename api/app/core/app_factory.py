@@ -39,10 +39,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description=settings.app_description,
         docs_url="/api/docs" if settings.environment != "production" else None,
         redoc_url="/api/redoc" if settings.environment != "production" else None,
+        openapi_url=(
+            "/api/openapi.json" if settings.environment != "production" else None
+        ),
         lifespan=lifespan,
     )
-
-    
 
     setup_middleware(app, settings)
     setup_exception_handlers(app)
@@ -53,12 +54,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(flights.router, prefix="/api/v1", tags=["Trips"])
     app.include_router(gmail.router, prefix="/api/v1", tags=["Gmail"])
     app.include_router(user.router, prefix="/api/v1", tags=["User"])
-    app.include_router(mail_connections.router, prefix="/api/v1", tags=["Mail Connections"])
+    app.include_router(
+        mail_connections.router, prefix="/api/v1", tags=["Mail Connections"]
+    )
 
     @app.get("/", include_in_schema=False)
     async def root():
         return {
-            "message": f"Welcome to {settings.app_name}. Visit /docs for API documentation.",
+            "message": f"Welcome to {settings.app_name}. Visit /api/docs for API documentation.",
             "version": settings.app_version,
             "environment": settings.environment,
         }
