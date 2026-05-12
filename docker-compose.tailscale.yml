@@ -53,7 +53,7 @@ services:
       - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.routers.api.priority=100"
-      - "traefik.http.services.api.loadbalancer.server.port=8001"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
     build:
       context: ./api
       dockerfile: Dockerfile
