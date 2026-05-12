@@ -37,10 +37,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description=settings.app_description,
-        docs_url="/api/docs" if settings.environment != "production" else None,
-        redoc_url="/api/redoc" if settings.environment != "production" else None,
+        root_path="/api",
+        docs_url="/docs" if settings.environment != "production" else None,
+        redoc_url="/redoc" if settings.environment != "production" else None,
         openapi_url=(
-            "/api/openapi.json" if settings.environment != "production" else None
+            "/openapi.json" if settings.environment != "production" else None
         ),
         lifespan=lifespan,
     )

@@ -52,6 +52,10 @@ services:
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.routers.api.priority=100"
       - "traefik.http.services.api.loadbalancer.server.port=8000"
+      # Apply the strip-prefix middleware
+      - "traefik.http.routers.api.middlewares=api-stripprefix@docker"
+      # Define the middleware
+      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
     build:
       context: ./api
       dockerfile: Dockerfile
