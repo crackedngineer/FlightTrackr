@@ -49,7 +49,7 @@ services:
     container_name: api
     labels:
       - "traefik.enable=true"
-      # - "traefik.docker.network=boarding-pass-parser_app"
+      - "traefik.docker.network=flighttrackr_network"
       - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.routers.api.priority=100"
@@ -73,13 +73,11 @@ services:
       tailscale:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - flighttrackr_network
 
   web:
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=boarding-pass-parser_app"
+      - "traefik.docker.network=flighttrackr_network"
       - "traefik.http.routers.web.rule=PathPrefix(`/`)"
       - "traefik.http.routers.web.entrypoints=web"
       - "traefik.http.routers.web.priority=1"
@@ -98,8 +96,6 @@ services:
     depends_on:
       - api
     restart: unless-stopped
-    networks:
-      - flighttrackr_network
 
   celery:
     build:
