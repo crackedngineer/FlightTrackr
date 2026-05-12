@@ -3,7 +3,7 @@ services:
   # Note :- Inside container run `tailscale funnel enable` to enable the funnel and expose the API to the internet via Tailscale.
   tailscale:
     image: tailscale/tailscale:latest
-    hostname: flighttrackr-api
+    hostname: flighttrackr
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
