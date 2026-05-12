@@ -1,5 +1,6 @@
 ﻿import time
 import logging
+from urllib.parse import urlparse
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -20,9 +21,10 @@ def setup_middleware(app: FastAPI, settings: Settings) -> None:
 
     # TrustedHostMiddleware only makes sense with explicit origins (not wildcard)
     if settings.environment == "production" and origins != ["*"]:
+        hosts = [urlparse(o).hostname or o for o in origins]
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=origins,
+            allowed_hosts=hosts,
         )
 
     @app.middleware("http")

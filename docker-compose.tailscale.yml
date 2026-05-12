@@ -1,4 +1,104 @@
 services:
+  # --- TAILSCALE FUNNEL ADDITION ---
+  # Note :- Inside container run `tailscale funnel enable` to enable the funnel and expose the API to the internet via Tailscale.
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: flighttrackr-api
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_EXTRA_ARGS=--advertise-tags=tag:container
+      - TS_SERVE_CONFIG=/config/funnel.json
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - ./.tailscale/funnel.json:/config/funnel.json
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "tailscale", "status", "--json"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=boarding-pass-parser_app"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    container_name: traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      tailscale:
+        condition: service_healthy
+    network_mode: service:tailscale
+    restart: unless-stopped
+
+  api:
+    container_name: api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=boarding-pass-parser_app"
+      - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api.priority=100"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    env_file:
+      - ./api/.env
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/flighttrackr
+      SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/flighttrackr
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DEBUG: "true"
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
+    depends_on:
+      tailscale:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=boarding-pass-parser_app"
+      - "traefik.http.routers.web.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.web.entrypoints=web"
+      - "traefik.http.routers.web.priority=1"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: web
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./web/.env.local
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: https://flighttrackr-api.tailcda03.ts.net/api/v1
+      NEXT_PUBLIC_API_URL: https://flighttrackr-api.tailcda03.ts.net/api/v1
+    depends_on:
+      - api
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -24,51 +124,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-
-  api:
-    container_name: api
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./api/.env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/flighttrackr
-      SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/flighttrackr
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-      DEBUG: "true"
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    network_mode: service:tailscale # Connects API container to Tailscale network for direct access without port mapping
-    depends_on:
-      tailscale:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  # --- TAILSCALE FUNNEL ADDITION ---
-  tailscale:
-    image: tailscale/tailscale:latest
-    hostname: flighttrackr-api
-    environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_EXTRA_ARGS=--advertise-tags=tag:container
-      - TS_SERVE_CONFIG=/config/funnel.json
-    volumes:
-      - tailscale_data:/var/lib/tailscale
-      - ./.tailscale/funnel.json:/config/funnel.json
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
-    restart: unless-stopped
 
   celery:
     build:

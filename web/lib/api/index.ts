@@ -12,7 +12,7 @@ export { default as healthService } from './health-service';
 export { AuthService } from './auth-service';
 
 // Named auth functions
-export { signInWithGoogle, signOut, connectGoogle, getMe, exchangeCodeForSession } from './auth-service';
+export { signInWithGoogle, signOut, connectGoogle, getMe } from './auth-service';
 
 // Flight functions
 export { listFlights, getFlight } from './flight-service';

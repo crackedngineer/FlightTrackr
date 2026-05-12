@@ -42,6 +42,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    
+
     setup_middleware(app, settings)
     setup_exception_handlers(app)
 
