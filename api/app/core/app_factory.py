@@ -40,23 +40,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         root_path="/api",
         docs_url="/docs" if settings.environment != "production" else None,
         redoc_url="/redoc" if settings.environment != "production" else None,
-        openapi_url=(
-            "/openapi.json" if settings.environment != "production" else None
-        ),
+        openapi_url=("/openapi.json" if settings.environment != "production" else None),
         lifespan=lifespan,
     )
 
     setup_middleware(app, settings)
     setup_exception_handlers(app)
 
-    app.include_router(health.router, prefix="/api/v1", tags=["Health"])
-    app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
-    app.include_router(boarding_pass.router, prefix="/api/v1", tags=["Boarding Pass"])
-    app.include_router(flights.router, prefix="/api/v1", tags=["Trips"])
-    app.include_router(gmail.router, prefix="/api/v1", tags=["Gmail"])
-    app.include_router(user.router, prefix="/api/v1", tags=["User"])
+    ROUTE_PREFIX = ""
+    app.include_router(health.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["Health"])
     app.include_router(
-        mail_connections.router, prefix="/api/v1", tags=["Mail Connections"]
+        auth.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["Authentication"]
+    )
+    app.include_router(
+        boarding_pass.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["Boarding Pass"]
+    )
+    app.include_router(flights.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["Trips"])
+    app.include_router(gmail.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["Gmail"])
+    app.include_router(user.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["User"])
+    app.include_router(
+        mail_connections.router, prefix=f"{ROUTE_PREFIX}/v1", tags=["Mail Connections"]
     )
 
     @app.get("/", include_in_schema=False)
