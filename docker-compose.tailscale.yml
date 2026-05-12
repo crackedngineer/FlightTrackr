@@ -30,7 +30,7 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=boarding-pass-parser_app"
+      # - "--providers.docker.network=boarding-pass-parser_app"
       - "--entrypoints.web.address=:80"
       - "--log.level=INFO"
       - "--accesslog=true"
@@ -42,12 +42,14 @@ services:
         condition: service_healthy
     network_mode: service:tailscale
     restart: unless-stopped
+    networks:
+      - flighttrackr_network
 
   api:
     container_name: api
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=boarding-pass-parser_app"
+      # - "traefik.docker.network=boarding-pass-parser_app"
       - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
       - "traefik.http.routers.api.entrypoints=web"
       - "traefik.http.routers.api.priority=100"
@@ -71,6 +73,8 @@ services:
       tailscale:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - flighttrackr_network
 
   web:
     labels:
@@ -94,6 +98,8 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      - flighttrackr_network
 
   celery:
     build:
@@ -108,11 +114,14 @@ services:
       CELERY_BROKER_URL: redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/0
       CELERY_RESULT_BACKEND: redis://${REDIS_USERNAME}:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/1
     command: uv run celery -A app.tasks.celery_app worker --loglevel=info --pool=prefork
+    networks:
+      - flighttrackr_network
 
 volumes:
   postgres_data:
   tailscale_data: # Persists Tailscale ID so it doesn't create a new node on every restart
 
 networks:
-  boarding-pass-parser_app:
+  flighttrackr_network:
+    driver: bridge
     external: false
