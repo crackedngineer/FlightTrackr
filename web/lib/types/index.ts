@@ -200,4 +200,5 @@ export interface GmailSyncState {
   emailsScanned: number;
   boardingPassesFound: number;
   error: string | null;
+  jobId?: string;
 }

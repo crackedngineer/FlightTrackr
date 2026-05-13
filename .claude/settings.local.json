@@ -17,7 +17,14 @@
       "Bash(python -m pip install pdfplumber zxing-cpp supabase pydantic-settings fastapi uvicorn \"celery[redis]\")",
       "Bash(git -C \"D:/Github Projects/Boarding-Pass-Parser\" status --short)",
       "Bash(uv run *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Github Projects\\\\Boarding-Pass-Parser\\\\app\\\\frontend\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Github Projects\\\\Boarding-Pass-Parser\" -Recurse -Directory)",
+      "Bash(cd /d \"D:\\\\Github Projects\\\\Boarding-Pass-Parser\")",
+      "Bash(dir /s /b app\\\\backend)",
+      "Bash(findstr /i gmail)"
     ]
   },
   "enableAllProjectMcpServers": true,
