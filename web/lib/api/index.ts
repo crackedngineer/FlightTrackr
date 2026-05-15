@@ -20,5 +20,14 @@ export { listFlights, getFlight } from './flight-service';
 // Gmail sync functions
 export { startGmailSync, getGmailSyncStatus } from './gmail-service';
 export type { GmailSyncJob, GmailSyncStatusResponse } from './gmail-service';
+
+// Mail connection functions
+export {
+  listMailConnections,
+  connectMailProvider,
+  exchangeMailCode,
+  revokeMailConnection,
+} from './mail-connection-service';
+
 export { BoardingPassService } from './boarding-pass-service';
 export { HealthService } from './health-service';

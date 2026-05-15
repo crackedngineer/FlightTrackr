@@ -7,7 +7,6 @@ from urllib.parse import urlencode
 import httpx
 
 from app.mail.base import MailCredentials, MailProvider
-from app.core.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +20,13 @@ class GmailProvider(MailProvider):
     provider_name = "gmail"
     auth_type = "oauth2"
 
-    def __init__(self, settings: Settings) -> None:
-        self._client_id = settings.google_client_id
-        self._client_secret = settings.google_client_secret
-        self._redirect_uri = settings.google_redirect_uri
+    def __init__(self, client_id: str, client_secret: str, redirect_uri: str) -> None:
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._redirect_uri = redirect_uri
+
+    def get_redirect_uri(self) -> str:
+        return self._redirect_uri
 
     def get_oauth_url(self, state: str, redirect_uri: str) -> str:
         params = {
@@ -93,7 +95,22 @@ class GmailProvider(MailProvider):
         creds.expires_at = datetime.now(timezone.utc) + timedelta(seconds=data.get("expires_in", 3600))
         return creds
 
+    async def trigger_first_sync(self, db, user_id: str) -> bool:
+        import uuid as _uuid
+        from app.models.gmail_sync_job import GmailSyncJob
+        from app.tasks.gmail_sync import sync_gmail_boarding_passes
+
+        job = GmailSyncJob(user_id=_uuid.UUID(user_id), status="pending")
+        db.add(job)
+        await db.flush()
+        task = sync_gmail_boarding_passes.delay(user_id, str(job.id))
+        job.celery_task_id = task.id
+        logger.info("First Gmail connect — auto-sync job=%s user=%s", job.id, user_id)
+        return True
+
     async def validate_credentials(self, creds: MailCredentials) -> bool:
+        if not creds.access_token:
+            return False
         try:
             await self._get_user_info(creds.access_token)
             return True

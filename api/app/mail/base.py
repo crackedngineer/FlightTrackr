@@ -55,12 +55,29 @@ class MailProvider(ABC):
     provider_name: str
     auth_type: str  # 'oauth2' | 'imap_password'
 
-    def get_oauth_url(self, state: str, redirect_uri: str) -> str:
-        raise NotImplementedError(f"{self.provider_name} does not support OAuth URL generation")
+    # ── OAuth strategy methods (implement for auth_type == 'oauth2') ──────────
 
-    @abstractmethod
+    def get_oauth_url(self, state: str, redirect_uri: str) -> str:
+        raise NotImplementedError(f"{self.provider_name} does not support OAuth")
+
+    def get_redirect_uri(self) -> str:
+        raise NotImplementedError(f"{self.provider_name} does not support OAuth")
+
     async def exchange_code(self, code: str, redirect_uri: str) -> MailCredentials:
-        ...
+        raise NotImplementedError(f"{self.provider_name} does not support OAuth")
+
+    # ── Password/IMAP strategy method (implement for auth_type == 'imap_password') ──
+
+    async def connect_with_password(self, provider_email: str, password: str) -> MailCredentials:
+        raise NotImplementedError(f"{self.provider_name} does not support password auth")
+
+    # ── Post-connect hook (override to trigger provider-specific side effects) ─
+
+    async def trigger_first_sync(self, db, user_id: str) -> bool:
+        """Called after the first successful connection. Returns True if a sync was queued."""
+        return False
+
+    # ── Token lifecycle ───────────────────────────────────────────────────────
 
     async def refresh_credentials(self, creds: MailCredentials) -> MailCredentials:
         return creds

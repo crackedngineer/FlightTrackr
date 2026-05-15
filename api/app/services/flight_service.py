@@ -33,6 +33,7 @@ def _parse_departure_to_datetime(dep_time_str: Optional[str]) -> Optional[dateti
 
 # ── Sync lookup helpers ───────────────────────────────────────────────────────
 
+
 def get_airline_by_iata_sync(session: Session, iata_code: str) -> Optional[Airline]:
     return session.execute(
         select(Airline).where(Airline.iata_code == iata_code.upper().strip())
@@ -47,52 +48,82 @@ def get_airport_by_iata_sync(session: Session, iata_code: str) -> Optional[Airpo
 
 # ── Sync upsert operations (Celery) ──────────────────────────────────────────
 
-def upsert_booking_sync(session: Session, user_id: str, airline_id: int,
-                     pnr_code: str, source: str = "gmail") -> Booking:
+
+def upsert_booking_sync(
+    session: Session,
+    user_id: str,
+    airline_id: int,
+    pnr_code: str,
+    source: str = "gmail",
+) -> Booking:
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
     existing = session.execute(
-        select(Booking).where(Booking.user_id == uid, Booking.airline_id == airline_id, Booking.pnr_code == pnr_code)
+        select(Booking).where(
+            Booking.user_id == uid,
+            Booking.airline_id == airline_id,
+            Booking.pnr_code == pnr_code,
+        )
     ).scalar_one_or_none()
     if existing:
         return existing
-    booking = Booking(user_id=uid, airline_id=airline_id, pnr_code=pnr_code, source=source)
+    booking = Booking(
+        user_id=uid, airline_id=airline_id, pnr_code=pnr_code, source=source
+    )
     session.add(booking)
     session.flush()
     return booking
 
 
 def upsert_flight_sync(
-    session: Session, booking_id: uuid.UUID, airline_id: int,
-    dep_airport_id: uuid.UUID, arr_airport_id: uuid.UUID,
-    flight_number: str, departure_time: datetime,
+    session: Session,
+    booking_id: uuid.UUID,
+    airline_id: int,
+    dep_airport_id: uuid.UUID,
+    arr_airport_id: uuid.UUID,
+    flight_number: str,
+    departure_time: datetime,
     arrival_time: Optional[datetime] = None,
-    gate: Optional[str] = None, terminal: Optional[str] = None,
+    gate: Optional[str] = None,
+    terminal: Optional[str] = None,
 ) -> Flight:
     existing = session.execute(
         select(Flight).where(
-            Flight.booking_id == booking_id, Flight.flight_number == flight_number,
-            Flight.airline_id == airline_id, Flight.departure_time == departure_time,
+            Flight.booking_id == booking_id,
+            Flight.flight_number == flight_number,
+            Flight.airline_id == airline_id,
+            Flight.departure_time == departure_time,
         )
     ).scalar_one_or_none()
     if existing:
         return existing
     flight = Flight(
-        booking_id=booking_id, airline_id=airline_id,
-        departure_airport=dep_airport_id, arrival_airport=arr_airport_id,
-        flight_number=flight_number, departure_time=departure_time,
-        arrival_time=arrival_time, gate=gate, terminal=terminal,
+        booking_id=booking_id,
+        airline_id=airline_id,
+        departure_airport=dep_airport_id,
+        arrival_airport=arr_airport_id,
+        flight_number=flight_number,
+        departure_time=departure_time,
+        arrival_time=arrival_time,
+        gate=gate,
+        terminal=terminal,
     )
     session.add(flight)
     session.flush()
     return flight
 
 
-def upsert_passenger_sync(session: Session, booking_id: uuid.UUID,
-                           first_name: Optional[str], last_name: Optional[str]) -> Passenger:
+def upsert_passenger_sync(
+    session: Session,
+    booking_id: uuid.UUID,
+    first_name: Optional[str],
+    last_name: Optional[str],
+) -> Passenger:
     fn, ln = (first_name or "").strip(), (last_name or "").strip()
     existing = session.execute(
         select(Passenger).where(
-            Passenger.booking_id == booking_id, Passenger.first_name == fn, Passenger.last_name == ln,
+            Passenger.booking_id == booking_id,
+            Passenger.first_name == fn,
+            Passenger.last_name == ln,
         )
     ).scalar_one_or_none()
     if existing:
@@ -104,22 +135,33 @@ def upsert_passenger_sync(session: Session, booking_id: uuid.UUID,
 
 
 def upsert_boarding_pass_sync(
-    session: Session, flight_id: uuid.UUID, passenger_id: uuid.UUID, barcode: str,
-    seat_number: Optional[str] = None, cabin_class: Optional[str] = None,
-    boarding_group: Optional[str] = None, source: Optional[str] = None,
+    session: Session,
+    flight_id: uuid.UUID,
+    passenger_id: uuid.UUID,
+    barcode: str,
+    seat_number: Optional[str] = None,
+    cabin_class: Optional[str] = None,
+    boarding_group: Optional[str] = None,
+    source: Optional[str] = None,
     source_message_id: Optional[str] = None,
 ) -> BoardingPass:
     existing = session.execute(
         select(BoardingPass).where(
-            BoardingPass.flight_id == flight_id, BoardingPass.passenger_id == passenger_id,
+            BoardingPass.flight_id == flight_id,
+            BoardingPass.passenger_id == passenger_id,
         )
     ).scalar_one_or_none()
     if existing:
         return existing
     bp = BoardingPass(
-        flight_id=flight_id, passenger_id=passenger_id, barcode=barcode,
-        seat_number=seat_number, cabin_class=cabin_class, boarding_group=boarding_group,
-        source=source, source_message_id=source_message_id,
+        flight_id=flight_id,
+        passenger_id=passenger_id,
+        barcode=barcode,
+        seat_number=seat_number,
+        cabin_class=cabin_class,
+        boarding_group=boarding_group,
+        source=source,
+        source_message_id=source_message_id,
     )
     session.add(bp)
     session.flush()
@@ -127,33 +169,52 @@ def upsert_boarding_pass_sync(
 
 
 def update_booking_metadata_sync(session: Session, booking_id: uuid.UUID) -> None:
-    flights = session.execute(
-        select(Flight).where(Flight.booking_id == booking_id).order_by(Flight.departure_time)
-    ).scalars().all()
+    flights = (
+        session.execute(
+            select(Flight)
+            .where(Flight.booking_id == booking_id)
+            .order_by(Flight.departure_time)
+        )
+        .scalars()
+        .all()
+    )
     if not flights:
         return
     booking = session.get(Booking, booking_id)
     if not booking:
         return
     booking.booking_type = "direct" if len(flights) == 1 else "connecting"
-    booking.start_date = flights[0].departure_time.date() if flights[0].departure_time else None
-    booking.end_date = flights[-1].departure_time.date() if flights[-1].departure_time else None
+    booking.start_date = (
+        flights[0].departure_time.date() if flights[0].departure_time else None
+    )
+    booking.end_date = (
+        flights[-1].departure_time.date() if flights[-1].departure_time else None
+    )
 
 
-def get_existing_message_ids_sync(session: Session, user_id: str, source: str,
-                                   message_ids: list[str]) -> set[str]:
+def get_existing_message_ids_sync(
+    session: Session, user_id: str, source: str, message_ids: list[str]
+) -> set[str]:
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-    rows = session.execute(
-        select(BoardingPass.source_message_id)
-        .join(Flight, BoardingPass.flight_id == Flight.id)
-        .join(Booking, Flight.booking_id == Booking.id)
-        .where(Booking.user_id == uid, BoardingPass.source == source,
-               BoardingPass.source_message_id.in_(message_ids))
-    ).scalars().all()
+    rows = (
+        session.execute(
+            select(BoardingPass.source_message_id)
+            .join(Flight, BoardingPass.flight_id == Flight.id)
+            .join(Booking, Flight.booking_id == Booking.id)
+            .where(
+                Booking.user_id == uid,
+                BoardingPass.source == source,
+                BoardingPass.source_message_id.in_(message_ids),
+            )
+        )
+        .scalars()
+        .all()
+    )
     return set(rows)
 
 
 # ── Async CRUD (FastAPI) ──────────────────────────────────────────────────────
+
 
 def _booking_load_options():
     return [
@@ -167,11 +228,13 @@ def _booking_load_options():
     ]
 
 
-async def list_bookings(session: AsyncSession, user_id: str,
-                     status_filter: Optional[str] = None) -> list[Booking]:
+async def list_bookings(
+    session: AsyncSession, user_id: str, status_filter: Optional[str] = None
+) -> list[Booking]:
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
     stmt = (
-        select(Booking).where(Booking.user_id == uid)
+        select(Booking)
+        .where(Booking.user_id == uid)
         .options(*_booking_load_options())
         .order_by(Booking.created_at.asc())
     )
@@ -184,11 +247,15 @@ async def list_bookings(session: AsyncSession, user_id: str,
     return list(result.scalars().unique().all())
 
 
-async def get_booking(session: AsyncSession, user_id: str, booking_id: str) -> Optional[Booking]:
+async def get_booking(
+    session: AsyncSession, user_id: str, booking_id: str
+) -> Optional[Booking]:
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
     bid = uuid.UUID(booking_id) if isinstance(booking_id, str) else booking_id
     result = await session.execute(
-        select(Booking).where(Booking.id == bid, Booking.user_id == uid).options(*_booking_load_options())
+        select(Booking)
+        .where(Booking.id == bid, Booking.user_id == uid)
+        .options(*_booking_load_options())
     )
     return result.scalar_one_or_none()
 
@@ -196,5 +263,7 @@ async def get_booking(session: AsyncSession, user_id: str, booking_id: str) -> O
 async def delete_booking(session: AsyncSession, user_id: str, booking_id: str) -> bool:
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
     bid = uuid.UUID(booking_id) if isinstance(booking_id, str) else booking_id
-    result = await session.execute(delete(Booking).where(Booking.id == bid, Booking.user_id == uid))
+    result = await session.execute(
+        delete(Booking).where(Booking.id == bid, Booking.user_id == uid)
+    )
     return result.rowcount > 0

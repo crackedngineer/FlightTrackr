@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { callback } from "@/lib/api/auth-service";
+import { exchangeMailCode } from "@/lib/api/mail-connection-service";
 import { Loader2, CheckCircle, XCircle, Plane } from "lucide-react";
 
 type Status = "loading" | "success" | "error";
@@ -14,94 +14,84 @@ const CONFIG: Record<
   loading: {
     icon: Loader2,
     iconCls: "text-amber-400 animate-spin",
-    title: "Authenticating…",
+    title: "Connecting inbox…",
     borderCls: "border-amber-500/20",
   },
   success: {
     icon: CheckCircle,
     iconCls: "text-emerald-400",
-    title: "Welcome!",
+    title: "Inbox connected!",
     borderCls: "border-emerald-500/20",
   },
   error: {
     icon: XCircle,
     iconCls: "text-red-400",
-    title: "Authentication Failed",
+    title: "Connection Failed",
     borderCls: "border-red-500/20",
   },
 };
 
-export default function CallbackPage() {
+export default function MailCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { code, state, request_gmail_access, oauthError, oauthErrDesc } =
-    useMemo(() => {
-      return {
-        code: searchParams.get("code"),
-        state: searchParams.get("state"),
-        request_gmail_access:
-          searchParams.get("request_gmail_access")?.toLowerCase() === "true",
-        oauthError: searchParams.get("error"),
-        oauthErrDesc: searchParams.get("error_description"),
-      };
-    }, [searchParams]);
+  const { code, state, provider, oauthError, oauthErrDesc } = useMemo(() => {
+    return {
+      code: searchParams.get("code"),
+      state: searchParams.get("state"),
+      provider: searchParams.get("provider") ?? "gmail",
+      oauthError: searchParams.get("error"),
+      oauthErrDesc: searchParams.get("error_description"),
+    };
+  }, [searchParams]);
 
-  const hasOAuthError = !!oauthError || !code;
+  const hasOAuthError = !!oauthError || !code || !state;
 
-  const [status, setStatus] = useState<"loading" | "success" | "error">(
-    hasOAuthError ? "error" : "loading",
-  );
-
+  const [status, setStatus] = useState<Status>(hasOAuthError ? "error" : "loading");
   const [message, setMessage] = useState(
     hasOAuthError
       ? (oauthErrDesc ?? oauthError ?? "Missing OAuth parameters")
-      : "Verifying your identity…",
+      : "Verifying access…",
   );
 
   useEffect(() => {
     if (hasOAuthError) {
-      // Only redirect AFTER showing error
-      const t = setTimeout(() => router.replace("/login"), 3000);
+      const t = setTimeout(() => router.replace("/dashboard"), 3000);
       return () => clearTimeout(t);
     }
 
-    let isMounted = true; // prevents state updates after unmount
+    let isMounted = true;
 
-    const handleAuth = async () => {
+    const handleConnect = async () => {
       try {
-        await callback(code!, state!, request_gmail_access!); // ⬅️ WAITS FULLY (no timeout interference)
+        await exchangeMailCode(provider, code!, state!);
 
         if (!isMounted) return;
 
         setStatus("success");
-        setMessage("Signed in successfully!");
+        setMessage("Gmail connected! Starting sync…");
 
-        // redirect ONLY after success
         setTimeout(() => {
           router.replace("/dashboard");
-        }, 800);
+        }, 1200);
       } catch (err) {
         if (!isMounted) return;
 
         setStatus("error");
-        setMessage(
-          err instanceof Error ? err.message : "Authentication failed",
-        );
+        setMessage(err instanceof Error ? err.message : "Connection failed");
 
-        // redirect ONLY after failure
         setTimeout(() => {
-          router.replace("/login");
+          router.replace("/dashboard");
         }, 3000);
       }
     };
 
-    handleAuth();
+    handleConnect();
 
     return () => {
       isMounted = false;
     };
-  }, [hasOAuthError, code, state, request_gmail_access, router]);
+  }, [hasOAuthError, code, state, provider, router]);
 
   const { icon: Icon, iconCls, title, borderCls } = CONFIG[status];
 
@@ -145,7 +135,7 @@ export default function CallbackPage() {
 
         {status === "error" && (
           <p className="font-data text-[10px] tracking-[0.2em] text-muted-foreground/40 uppercase">
-            Redirecting to login…
+            Redirecting…
           </p>
         )}
       </div>

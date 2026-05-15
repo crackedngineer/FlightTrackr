@@ -1,24 +1,54 @@
 from __future__ import annotations
 
-import secrets
+import json
 import logging
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_db_session
-from app.core.settings import get_settings
+from app.core.redis import get_redis_client
 from app.mail import registry as mail_registry
-from app.mail.protonmail import ProtonMailProvider
 from app.services import mail_token_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mail")
 
-# Simple in-process state store — replace with Redis TTL keys for multi-replica deployments
-_pending_states: dict[str, dict] = {}
+_STATE_TTL = 600  # 10 minutes
+
+
+# ── Redis-backed OAuth state helpers ─────────────────────────────────────────
+
+
+async def _make_state(redis: Redis, user_id: str, provider: str) -> str:
+    token = secrets.token_urlsafe(32)
+    await redis.setex(
+        f"mail_oauth_state:{token}",
+        _STATE_TTL,
+        json.dumps({"user_id": user_id, "provider": provider}),
+    )
+    return token
+
+
+async def _consume_state(redis: Redis, state: str, provider: str) -> str:
+    key = f"mail_oauth_state:{state}"
+    raw = await redis.get(key)
+    if raw is None:
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired OAuth state parameter."
+        )
+    await redis.delete(key)
+    entry = json.loads(raw.decode())
+    if entry["provider"] != provider:
+        raise HTTPException(status_code=400, detail="OAuth state provider mismatch.")
+    return entry["user_id"]
+
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
 
 
 class ConnectResponse(BaseModel):
@@ -26,9 +56,16 @@ class ConnectResponse(BaseModel):
     state: str
 
 
-class ProtonConnectRequest(BaseModel):
-    provider_email: str
-    imap_password: str
+class ConnectRequest(BaseModel):
+    """Used only by password-based providers (e.g. ProtonMail). OAuth providers ignore this body."""
+
+    provider_email: str | None = None
+    password: str | None = None
+
+
+class MailCallbackRequest(BaseModel):
+    code: str
+    state: str
 
 
 class ConnectionOut(BaseModel):
@@ -41,19 +78,7 @@ class ConnectionOut(BaseModel):
     last_synced_at: Any
 
 
-def _make_state(user_id: str, provider: str) -> str:
-    token = secrets.token_urlsafe(32)
-    _pending_states[token] = {"user_id": user_id, "provider": provider}
-    return token
-
-
-def _consume_state(state: str, provider: str) -> str:
-    entry = _pending_states.pop(state, None)
-    if entry is None:
-        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state parameter.")
-    if entry["provider"] != provider:
-        raise HTTPException(status_code=400, detail="OAuth state provider mismatch.")
-    return entry["user_id"]
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 
 def _connection_out(record) -> ConnectionOut:
@@ -68,6 +93,9 @@ def _connection_out(record) -> ConnectionOut:
     )
 
 
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+
 @router.get("/connections", response_model=list[ConnectionOut])
 async def list_connections(
     user_id: str = Depends(get_current_user),
@@ -77,66 +105,92 @@ async def list_connections(
     return [_connection_out(r) for r in records]
 
 
-@router.post("/{provider}/connect", response_model=ConnectResponse)
+@router.post("/{provider}/connect")
 async def connect_provider(
     provider: str,
+    body: ConnectRequest = ConnectRequest(),
     user_id: str = Depends(get_current_user),
-    settings=Depends(get_settings),
-) -> ConnectResponse:
+    db: AsyncSession = Depends(get_db_session),
+    redis: Redis = Depends(get_redis_client),
+):
+    """
+    Unified connect endpoint.
+    - OAuth providers (auth_type='oauth2'): returns ConnectResponse with auth_url.
+    - Password providers (auth_type='imap_password'): accepts provider_email + password, returns ConnectionOut.
+    """
     mail_provider = mail_registry.get(provider)
-    redirect_uri = str(settings.google_redirect_uri or "")
-    state = _make_state(user_id, provider)
-    try:
+
+    if mail_provider.auth_type == "oauth2":
+        state = await _make_state(redis, user_id, provider)
+        redirect_uri = mail_provider.get_redirect_uri()
         auth_url = mail_provider.get_oauth_url(state=state, redirect_uri=redirect_uri)
-    except NotImplementedError:
-        _pending_states.pop(state, None)
+        return ConnectResponse(auth_url=auth_url, state=state)
+
+    # imap_password path
+    if not body.provider_email or not body.password:
         raise HTTPException(
-            status_code=400,
-            detail=f"Provider '{provider}' does not use OAuth. Use the provider-specific connect endpoint.",
+            status_code=422,
+            detail=f"provider_email and password are required for '{provider}'.",
         )
-    return ConnectResponse(auth_url=auth_url, state=state)
-
-
-@router.get("/{provider}/callback")
-async def oauth_callback(
-    provider: str,
-    code: str,
-    state: str,
-    db: AsyncSession = Depends(get_db_session),
-    settings=Depends(get_settings),
-) -> dict:
-    user_id = _consume_state(state, provider)
-    mail_provider = mail_registry.get(provider)
-    redirect_uri = str(settings.google_redirect_uri or "")
-
     try:
-        creds = await mail_provider.exchange_code(code=code, redirect_uri=redirect_uri)
-    except Exception as exc:
-        logger.error("OAuth code exchange failed for %s: %s", provider, exc)
-        raise HTTPException(status_code=400, detail=f"Failed to exchange OAuth code: {exc}")
-
-    record = await mail_token_service.store_connection(db, user_id, provider, creds)
-    await db.commit()
-    logger.info("Mail connection stored: user=%s provider=%s email=%s", user_id, provider, creds.provider_email)
-    return {"message": f"{provider} connected successfully", "connection_id": str(record.id)}
-
-
-@router.post("/protonmail/connect", response_model=ConnectionOut)
-async def connect_protonmail(
-    request: ProtonConnectRequest,
-    user_id: str = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db_session),
-) -> ConnectionOut:
-    provider = mail_registry.get("protonmail")
-    if not isinstance(provider, ProtonMailProvider):
-        raise HTTPException(status_code=500, detail="ProtonMail provider not configured.")
-    try:
-        creds = await provider.build_credentials(request.provider_email, request.imap_password)
+        creds = await mail_provider.connect_with_password(
+            body.provider_email, body.password
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    record = await mail_token_service.store_connection(db, user_id, "protonmail", creds)
+    record = await mail_token_service.store_connection(db, user_id, provider, creds)
     await db.commit()
     return _connection_out(record)
+
+
+@router.post("/{provider}/callback")
+async def oauth_callback(
+    provider: str,
+    body: MailCallbackRequest,
+    db: AsyncSession = Depends(get_db_session),
+    redis: Redis = Depends(get_redis_client),
+) -> dict:
+    user_id = await _consume_state(redis, body.state, provider)
+    mail_provider = mail_registry.get(provider)
+
+    if mail_provider.auth_type != "oauth2":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Provider '{provider}' does not use OAuth. Use POST /mail/{provider}/connect.",
+        )
+
+    redirect_uri = mail_provider.get_redirect_uri()
+    try:
+        creds = await mail_provider.exchange_code(
+            code=body.code, redirect_uri=redirect_uri
+        )
+    except Exception as exc:
+        logger.error("OAuth code exchange failed for %s: %s", provider, exc)
+        raise HTTPException(
+            status_code=400, detail=f"Failed to exchange OAuth code: {exc}"
+        )
+
+    connections = await mail_token_service.list_connections(db, user_id)
+    is_first = not any(c.provider == provider for c in connections)
+
+    record = await mail_token_service.store_connection(db, user_id, provider, creds)
+
+    sync_triggered = False
+    if is_first:
+        sync_triggered = await mail_provider.trigger_first_sync(db, user_id)
+
+    await db.commit()
+    logger.info(
+        "Mail connection stored: user=%s provider=%s email=%s",
+        user_id,
+        provider,
+        creds.provider_email,
+    )
+    return {
+        "message": f"{provider} connected successfully",
+        "connection_id": str(record.id),
+        "sync_triggered": sync_triggered,
+    }
 
 
 @router.delete("/connections/{connection_id}")

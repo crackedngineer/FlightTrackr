@@ -28,7 +28,7 @@ class AuthService:
         self.supabase_client = supabase_client
         self.redis_client = redis_client
 
-    async def authenticate_with_google(self) -> dict:
+    async def authenticate_with_google(self, request_gmail_access: bool) -> dict:
         from app.core.settings import get_settings
 
         settings = get_settings()
@@ -38,16 +38,26 @@ class AuthService:
         state = secrets.token_urlsafe(32)
 
         options: SignInWithOAuthCredentialsOptions = {
-            "scopes": "https://www.googleapis.com/auth/gmail.readonly",
             "query_params": {
+                "scope": "openid email profile",
                 "access_type": "offline",
                 "prompt": "consent",
                 "code_challenge": code_challenge,
                 "code_challenge_method": "S256",
             },
         }
+        if request_gmail_access:
+            options["query_params"][
+                "scope"
+            ] += " https://www.googleapis.com/auth/gmail.readonly"
         if settings.google_redirect_uri:
-            options["redirect_to"] = settings.google_redirect_uri + "?state=" + state
+            options["redirect_to"] = (
+                settings.google_redirect_uri
+                + "?state="
+                + state
+                + "&request_gmail_access="
+                + str(request_gmail_access).lower()
+            )
         result = self.supabase_client.auth.sign_in_with_oauth(
             SignInWithOAuthCredentials(provider="google", options=options)
         )

@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     # OAuth — Google
     google_client_id: Optional[str] = None
     google_redirect_uri: Optional[str] = None
+    google_mail_redirect_uri: Optional[str] = None
     google_client_secret: Optional[str] = None
 
     # OAuth — Microsoft (Outlook)

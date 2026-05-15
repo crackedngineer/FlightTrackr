@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plane } from "lucide-react";
+import { Mail, Plane } from "lucide-react";
 import { useAuth } from "@/lib/hooks";
+import { useMailConnection } from "@/lib/hooks/useMailConnection";
 import { SyncScreen } from "@/components/sync-screen";
 import { BookingCard } from "@/components/booking-card";
 import { cn } from "@/lib/utils";
@@ -57,19 +58,23 @@ export default function DashboardPage() {
   const { syncState, isFirstSync, initialized, startSync } =
     useGmailSyncContext();
   const { flights, isLoading: flightsLoading, refetch: refetchFlights } = useFlights();
+  const { isProviderConnected, startConnect, isLoading: connectionLoading } =
+    useMailConnection();
+  const isGmailConnected = isProviderConnected("gmail");
 
   const bookings = groupFlightsByPnr(flights);
 
   // Derived — no state needed; SyncScreen manages its own fade-out internally
   const showSync = !["idle", "error"].includes(syncState.status);
 
-  // Auto-start sync on first visit
+  // Auto-start sync on first visit — only when Gmail is connected
   useEffect(() => {
-    if (!initialized) return;
-    if (isFirstSync && syncState.status === "idle") return startSync();
-  }, [initialized, isFirstSync, syncState.status, startSync]);
+    if (!initialized || connectionLoading) return;
+    if (!isGmailConnected) return;
+    if (isFirstSync && syncState.status === "idle") startSync();
+  }, [initialized, connectionLoading, isGmailConnected, isFirstSync, syncState.status, startSync]);
 
-  if (authLoading || flightsLoading) {
+  if (authLoading || flightsLoading || connectionLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Plane className="w-6 h-6 text-amber-400 animate-pulse" />
@@ -80,6 +85,32 @@ export default function DashboardPage() {
   if (!user) {
     router.push("/login");
     return null;
+  }
+
+  // State machine: disconnected — show connect prompt
+  if (!isGmailConnected) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+        <div className="w-16 h-16 rounded-2xl border border-amber-500/20 bg-amber-500/8 flex items-center justify-center">
+          <Mail className="w-7 h-7 text-amber-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">
+            Connect your inbox
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+            Link Gmail to automatically import your boarding passes.
+          </p>
+        </div>
+        <button
+          onClick={() => startConnect("gmail")}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-medium hover:bg-amber-500/25 transition-colors"
+        >
+          <Mail className="w-4 h-4" />
+          Connect Gmail
+        </button>
+      </div>
+    );
   }
 
   const upcoming = flights.filter((f) => f.status === "upcoming");

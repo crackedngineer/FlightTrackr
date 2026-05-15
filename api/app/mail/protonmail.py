@@ -14,18 +14,14 @@ class ProtonMailProvider(MailProvider):
     provider_name = "protonmail"
     auth_type = "imap_password"
 
-    def get_oauth_url(self, state: str, redirect_uri: str) -> str:
-        raise NotImplementedError(
-            "ProtonMail uses App Passwords, not OAuth. Use POST /mail/protonmail/connect instead."
-        )
-
-    async def exchange_code(self, code: str, redirect_uri: str) -> MailCredentials:
-        raise NotImplementedError("ProtonMail does not support OAuth code exchange.")
+    def __init__(self, host: str = _IMAP_HOST, port: int = _IMAP_PORT) -> None:
+        self._host = host
+        self._port = port
 
     async def validate_credentials(self, creds: MailCredentials) -> bool:
         try:
             import aioimaplib
-            imap = aioimaplib.IMAP4(host=_IMAP_HOST, port=_IMAP_PORT)
+            imap = aioimaplib.IMAP4(host=self._host, port=self._port)
             await imap.wait_hello_from_server()
             result, _ = await imap.login(creds.provider_email, creds.imap_password)
             await imap.logout()
@@ -34,11 +30,11 @@ class ProtonMailProvider(MailProvider):
             logger.warning("ProtonMail IMAP validation failed for %s: %s", creds.provider_email, exc)
             return False
 
-    async def build_credentials(self, provider_email: str, imap_password: str) -> MailCredentials:
+    async def connect_with_password(self, provider_email: str, password: str) -> MailCredentials:
         creds = MailCredentials(
             provider_email=provider_email,
             provider_user_id=provider_email,
-            imap_password=imap_password,
+            imap_password=password,
             scopes=["imap"],
         )
         if not await self.validate_credentials(creds):

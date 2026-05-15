@@ -58,6 +58,10 @@ class AuthResponse(BaseModel):
     expires_in: int
 
 
+class GoogleSignInRequest(BaseModel):
+    request_gmail_access: bool = False
+
+
 class GoogleSignInResponse(BaseModel):
     url: str
 
@@ -82,16 +86,17 @@ class TokenRefreshRequest(BaseModel):
 class CallbackRequest(BaseModel):
     code: str
     state: str
+    request_gmail_access: Optional[bool] = False
 
 
 @router.post(
     "/google/signin", response_model=GoogleSignInResponse, summary="Sign in with Google"
 )
 async def google_signin(
-    response: Response,
+    request_gmail_access: Optional[bool] = False,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> GoogleSignInResponse:
-    data = await auth_service.authenticate_with_google()
+    data = await auth_service.authenticate_with_google(bool(request_gmail_access))
     return GoogleSignInResponse(url=data["url"])
 
 
@@ -121,37 +126,44 @@ async def auth_callback(
             status_code=400, detail="User ID not found in token exchange result"
         )
 
-    # try:
-    #     if session is not None:
-    #         refresh_token, access_token = auth_service.get_google_tokens(session)
-    #         provider_email = user.email or ""
-    #         connections = await mail_token_service.list_connections(db, str(user.id))
-    #         is_first = not any(c.provider == "gmail" for c in connections)
+    if body.request_gmail_access:
+        try:
+            if session is not None:
+                refresh_token, access_token = auth_service.get_google_tokens(session)
+                provider_email = user.email or ""
+                connections = await mail_token_service.list_connections(
+                    db, str(user.id)
+                )
+                is_first = not any(c.provider == "gmail" for c in connections)
 
-    #         gmail_creds = MailCredentials(
-    #             provider_email=provider_email,
-    #             access_token=access_token,
-    #             refresh_token=refresh_token,
-    #             scopes=["https://www.googleapis.com/auth/gmail.readonly"],
-    #         )
-    #         await mail_token_service.store_connection(
-    #             db, str(user.id), "gmail", gmail_creds
-    #         )
+                gmail_creds = MailCredentials(
+                    provider_email=provider_email,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    scopes=["https://www.googleapis.com/auth/gmail.readonly"],
+                )
+                await mail_token_service.store_connection(
+                    db, str(user.id), "gmail", gmail_creds
+                )
 
-    #         if is_first:
-    #             job = GmailSyncJob(user_id=_uuid.UUID(str(user.id)), status="pending")
-    #             db.add(job)
-    #             await db.flush()
-    #             task = sync_gmail_boarding_passes.delay(str(user.id), str(job.id))
-    #             job.celery_task_id = task.id
-    #             logger.info(
-    #                 "First Google connect — auto-sync job=%s user=%s", job.id, user.id
-    #             )
-    #         await db.commit()
-    #     else:
-    #         logger.warning("Session is None, skipping Google token storage")
-    # except Exception as exc:
-    #     logger.warning("Could not store Google tokens: %s", exc)
+                if is_first:
+                    job = GmailSyncJob(
+                        user_id=_uuid.UUID(str(user.id)), status="pending"
+                    )
+                    db.add(job)
+                    await db.flush()
+                    task = sync_gmail_boarding_passes.delay(str(user.id), str(job.id))
+                    job.celery_task_id = task.id
+                    logger.info(
+                        "First Google connect — auto-sync job=%s user=%s",
+                        job.id,
+                        user.id,
+                    )
+                await db.commit()
+            else:
+                logger.warning("Session is None, skipping Google token storage")
+        except Exception as exc:
+            logger.warning("Could not store Google tokens: %s", exc)
 
     return {"success": True, "user_id": str(user.id)}
 

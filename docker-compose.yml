@@ -25,48 +25,48 @@ services:
       timeout: 3s
       retries: 5
 
-  api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./api/.env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/flighttrackr
-      SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/flighttrackr
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-      DEBUG: "true"
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+  # api:
+  #   build:
+  #     context: ./api
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   env_file:
+  #     - ./api/.env
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/flighttrackr
+  #     SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/flighttrackr
+  #     REDIS_URL: redis://redis:6379/0
+  #     CELERY_BROKER_URL: redis://redis:6379/0
+  #     CELERY_RESULT_BACKEND: redis://redis:6379/1
+  #     DEBUG: "true"
+  #   command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
 
-  celery:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    env_file:
-      - ./api/.env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/flighttrackr
-      SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/flighttrackr
-      REDIS_URL: redis://redis:6379/0
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-    # volumes:
-    #   - ./api:/app
-    command: uv run celery -A app.tasks.celery_app worker --loglevel=info --pool=prefork
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+  # celery:
+  #   build:
+  #     context: ./api
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - ./api/.env
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/flighttrackr
+  #     SYNC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/flighttrackr
+  #     REDIS_URL: redis://redis:6379/0
+  #     CELERY_BROKER_URL: redis://redis:6379/0
+  #     CELERY_RESULT_BACKEND: redis://redis:6379/1
+  #   # volumes:
+  #   #   - ./api:/app
+  #   command: uv run celery -A app.tasks.celery_app worker --loglevel=info --pool=prefork
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
 
   # web:
   #   build:

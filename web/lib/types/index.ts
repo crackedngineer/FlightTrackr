@@ -202,3 +202,32 @@ export interface GmailSyncState {
   error: string | null;
   jobId?: string;
 }
+
+// ─── Mail Connection Types ────────────────────────────────────────────────────
+
+export interface MailConnection {
+  id: string;
+  provider: string;
+  provider_email: string;
+  status: 'active' | 'revoked' | 'error';
+  scopes: string[];
+  connected_at: string | null;
+  last_synced_at: string | null;
+}
+
+export type MailConnectionState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error';
+
+export interface ConnectMailResponse {
+  auth_url: string;
+  state: string;
+}
+
+export interface MailCallbackResult {
+  message: string;
+  connection_id: string;
+  sync_triggered: boolean;
+}

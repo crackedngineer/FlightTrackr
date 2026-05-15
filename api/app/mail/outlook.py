@@ -7,7 +7,6 @@ from urllib.parse import urlencode
 import httpx
 
 from app.mail.base import MailCredentials, MailProvider
-from app.core.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +20,13 @@ class OutlookProvider(MailProvider):
     provider_name = "outlook"
     auth_type = "oauth2"
 
-    def __init__(self, settings: Settings) -> None:
-        self._client_id = settings.microsoft_client_id
-        self._client_secret = settings.microsoft_client_secret
-        self._redirect_uri = settings.microsoft_redirect_uri
+    def __init__(self, client_id: str, client_secret: str, redirect_uri: str) -> None:
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._redirect_uri = redirect_uri
+
+    def get_redirect_uri(self) -> str:
+        return self._redirect_uri
 
     def get_oauth_url(self, state: str, redirect_uri: str) -> str:
         params = {

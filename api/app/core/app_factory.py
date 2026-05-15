@@ -1,4 +1,6 @@
-﻿import logging
+﻿import asyncio
+import logging
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.settings import get_settings, Settings
@@ -13,15 +15,32 @@ from app.mail.protonmail import ProtonMailProvider
 
 
 def _register_mail_providers(settings: Settings) -> None:
-    if settings.google_client_id:
-        mail_registry.register(GmailProvider(settings))
-    if settings.microsoft_client_id:
-        mail_registry.register(OutlookProvider(settings))
+    if settings.google_client_id and settings.google_client_secret:
+        mail_registry.register(GmailProvider(
+            client_id=settings.google_client_id,
+            client_secret=settings.google_client_secret,
+            redirect_uri=str(settings.google_mail_redirect_uri or settings.google_redirect_uri or ""),
+        ))
+    if settings.microsoft_client_id and settings.microsoft_client_secret:
+        mail_registry.register(OutlookProvider(
+            client_id=settings.microsoft_client_id,
+            client_secret=settings.microsoft_client_secret,
+            redirect_uri=str(settings.microsoft_redirect_uri or ""),
+        ))
     mail_registry.register(ProtonMailProvider())
+
+
+# def _suppress_win32_connection_reset(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+#     """Silence the spurious WinError 10054 from ProactorEventLoop on Windows."""
+#     if isinstance(context.get("exception"), ConnectionResetError):
+#         return
+#     loop.default_exception_handler(context)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # if sys.platform == "win32":
+    #     asyncio.get_event_loop().set_exception_handler(_suppress_win32_connection_reset)
     settings = get_settings()
     _register_mail_providers(settings)
     logging.info("FlightTrackr API starting up…")

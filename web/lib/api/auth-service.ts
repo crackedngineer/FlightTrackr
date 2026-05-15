@@ -2,13 +2,20 @@ import type { User } from "@/lib/types";
 import config from "@/lib/config";
 import httpClient from "@/lib/api/http-client";
 
+const REQUEST_GMAIL_ACCESS = true;
+
 export async function signInWithGoogle(): Promise<void> {
-  const data = await httpClient.post<{ url: string }>(
-    "/auth/google/signin",
-    undefined,
-    { includeAuth: false },
+  const res = await fetch(
+    `${config.api.baseUrl}/auth/google/signin?request_gmail_access=${REQUEST_GMAIL_ACCESS}`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    },
   );
-  window.location.href = data.url;
+  if (!res.ok) throw new Error("Failed to initiate sign-in");
+  const { url } = (await res.json()) as { url: string };
+  window.location.href = url;
 }
 
 export async function storeGoogleToken(
@@ -21,8 +28,16 @@ export async function storeGoogleToken(
   });
 }
 
-export async function callback(code: string, state: string): Promise<void> {
-  await httpClient.post("/auth/callback", { code, state }, { includeAuth: false });
+export async function callback(
+  code: string,
+  state: string,
+  request_gmail_access: boolean,
+): Promise<void> {
+  await httpClient.post(
+    "/auth/callback",
+    { code, state, request_gmail_access },
+    { includeAuth: false },
+  );
 }
 
 export async function exchangeCode(code: string, state: string): Promise<void> {
