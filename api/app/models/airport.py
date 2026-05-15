@@ -10,7 +10,7 @@ class Airport(Base, TimestampMixin):
     __table_args__ = ({"schema": "public"},)
 
     id = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    iata_code = mapped_column(String(10), nullable=False, unique=True)
+    iata_code = mapped_column(String(10), nullable=False)
     icao_code = mapped_column(String(10), nullable=True, unique=True)
     name = mapped_column(String(100), nullable=False)
     city = mapped_column(String(50), nullable=True)
