@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from app.core.settings import get_settings, Settings
 from app.core.exceptions import setup_exception_handlers
 from app.core.middleware import setup_middleware
-from app.routes.v1 import health, boarding_pass
-from app.routes.v1.endpoints import auth, flights, gmail, user, mail_connections
+from app.routes.v1 import health
+from app.routes.v1.endpoints import auth, boarding_pass, flights, gmail, user, mail_connections
 import app.mail.registry as mail_registry
 from app.mail.gmail import GmailProvider
 from app.mail.outlook import OutlookProvider

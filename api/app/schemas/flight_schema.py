@@ -46,7 +46,7 @@ class FlightResponse(BaseModel):
 class BookingResponse(BaseModel):
     id: str
     pnr_code: str
-    trip_type: str
+    booking_type: str
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     airline: AirlineInfo
@@ -54,14 +54,14 @@ class BookingResponse(BaseModel):
     flights: list[FlightResponse]
 
     @classmethod
-    def from_orm(cls, trip) -> "BookingResponse":
+    def from_orm(cls, booking) -> "BookingResponse":
         def fmt(dt) -> Optional[str]:
             if dt is None:
                 return None
             return dt.isoformat() if isinstance(dt, (datetime, date)) else str(dt)
 
         segments = []
-        for f in (trip.flights or []):
+        for f in (booking.flights or []):
             bps = []
             for bp in (f.boarding_passes or []):
                 bps.append(BoardingPassResponse(
@@ -101,16 +101,16 @@ class BookingResponse(BaseModel):
             ))
 
         return cls(
-            id=str(trip.id),
-            pnr_code=trip.pnr_code,
-            trip_type=trip.trip_type,
-            start_date=fmt(trip.start_date),
-            end_date=fmt(trip.end_date),
+            id=str(booking.id),
+            pnr_code=booking.pnr_code,
+            booking_type=booking.booking_type,
+            start_date=fmt(booking.start_date),
+            end_date=fmt(booking.end_date),
             airline=AirlineInfo(
-                iata_code=trip.airline_rel.iata_code if trip.airline_rel else "",
-                name=trip.airline_rel.name if trip.airline_rel else None,
+                iata_code=booking.airline_rel.iata_code if booking.airline_rel else "",
+                name=booking.airline_rel.name if booking.airline_rel else None,
             ),
-            source=trip.source,
+            source=booking.source,
             flights=segments,
         )
 
