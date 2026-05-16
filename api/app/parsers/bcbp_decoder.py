@@ -38,7 +38,7 @@ def extract_bcbp_barcode(pdf_bytes: bytes) -> str:
 
 
 def parse_bcbp_barcode(bcbp_data: str) -> dict:
-    result = {}
+    result = {"barcode": bcbp_data}
 
     name_bcbp = bcbp_data[2:22].replace(" ", "")
     fullname = name_bcbp.split("/")

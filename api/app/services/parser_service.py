@@ -14,7 +14,7 @@ import logging
 
 class BoardingPassService:
     """Service for processing boarding pass documents."""
-    
+
     def __init__(self, factory: ParserFactory):
         self.factory = factory
         self.logger = logging.getLogger(__name__)
@@ -22,23 +22,23 @@ class BoardingPassService:
     def process(self, pdf_bytes: bytes) -> ParsedBoardingPass:
         """
         Process boarding pass PDF and extract flight information.
-        
+
         Args:
             pdf_bytes: PDF file content as bytes
-            
+
         Returns:
             Parsed boarding pass data
-            
+
         Raises:
             ValidationException: If input is invalid
             BoardingPassParsingException: If parsing fails
         """
         if not pdf_bytes:
             raise ValidationException("PDF content is empty")
-        
+
         try:
             self.logger.info("Starting boarding pass parsing process")
-            
+
             # Decode BCBP barcode and extract details
             bcbp_barcode = extract_bcbp_barcode(pdf_bytes)
             if not bcbp_barcode:
@@ -48,9 +48,7 @@ class BoardingPassService:
 
             bcbp_details = parse_bcbp_barcode(bcbp_barcode)
             if not bcbp_details:
-                raise BoardingPassParsingException(
-                    "Failed to parse BCBP barcode data"
-                )
+                raise BoardingPassParsingException("Failed to parse BCBP barcode data")
 
             # Extract text content from PDF
             raw_data = extract_text_pdfplumber(pdf_bytes)
@@ -61,10 +59,9 @@ class BoardingPassService:
 
             # Get appropriate parser based on airline
             parser = self.factory.get_parser(
-                bcbp_details.get("operator_code", None), 
-                raw_data
+                bcbp_details.get("operator_code", None), raw_data
             )
-            
+
             if not parser:
                 raise BoardingPassParsingException(
                     "No suitable parser found for this boarding pass"
@@ -72,7 +69,7 @@ class BoardingPassService:
 
             # Parse the boarding pass content
             result = parser.parse(raw_data, bcbp_details)
-            
+
             if not result:
                 raise BoardingPassParsingException(
                     "Parser failed to extract boarding pass data"
@@ -81,14 +78,16 @@ class BoardingPassService:
             self.logger.info(
                 f"Successfully parsed boarding pass for flight {result.flight_number}"
             )
-            
+
             return result
-            
+
         except (ValidationException, BoardingPassParsingException):
             # Re-raise our custom exceptions
             raise
         except Exception as e:
-            self.logger.error(f"Unexpected error during boarding pass processing: {str(e)}")
+            self.logger.error(
+                f"Unexpected error during boarding pass processing: {str(e)}"
+            )
             raise BoardingPassParsingException(
                 f"Failed to process boarding pass: {str(e)}"
             )

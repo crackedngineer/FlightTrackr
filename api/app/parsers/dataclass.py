@@ -21,4 +21,4 @@ class ParsedBoardingPass:
     departure_time: Optional[str] = None
     cabin_class: Optional[str] = None
     checkin_sequence: Optional[str] = None
-    barcode: Optional[str] = None
+    barcode: str = ""
