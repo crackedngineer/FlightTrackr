@@ -3,7 +3,6 @@ Boarding pass parsing service with proper error handling.
 Implements business logic for parsing boarding passes from PDF files.
 """
 
-from typing import Dict, Any
 from app.parsers.dataclass import ParsedBoardingPass
 from app.parsers.factory import ParserFactory
 from app.parsers.bcbp_decoder import extract_bcbp_barcode, parse_bcbp_barcode
@@ -53,9 +52,10 @@ class BoardingPassService:
             # Extract text content from PDF
             raw_data = extract_text_pdfplumber(pdf_bytes)
             if not raw_data or not raw_data.strip():
-                raise BoardingPassParsingException(
-                    "Could not extract text content from PDF"
-                )
+                self.logger.error("No text content extracted from PDF")
+                # raise BoardingPassParsingException(
+                #     "Could not extract text content from PDF"
+                # )
 
             # Get appropriate parser based on airline
             parser = self.factory.get_parser(

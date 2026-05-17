@@ -18,8 +18,8 @@ export { signInWithGoogle, signOut, connectGoogle, getMe } from './auth-service'
 export { listBookings, getBooking } from './flight-service';
 
 // Gmail sync functions
-export { startGmailSync, getGmailSyncStatus } from './gmail-service';
-export type { GmailSyncJob, GmailSyncStatusResponse } from './gmail-service';
+export { getGmailSyncStatus } from './gmail-service';
+export type { GmailSyncStatusResponse } from './gmail-service';
 
 // Mail connection functions
 export {

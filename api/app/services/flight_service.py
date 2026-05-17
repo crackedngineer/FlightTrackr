@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 from sqlalchemy import select, delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.flight import Booking, Flight, Passenger, BoardingPass
@@ -245,6 +246,11 @@ async def upsert_booking_async(
     source: str = "upload",
 ) -> Booking:
     uid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    await session.execute(
+        pg_insert(Booking)
+        .values(user_id=uid, airline_id=airline_id, pnr_code=pnr_code, source=source)
+        .on_conflict_do_nothing(constraint="uq_bookings_user_airline_pnr")
+    )
     result = await session.execute(
         select(Booking).where(
             Booking.user_id == uid,
@@ -252,13 +258,7 @@ async def upsert_booking_async(
             Booking.pnr_code == pnr_code,
         )
     )
-    existing = result.scalar_one_or_none()
-    if existing:
-        return existing
-    booking = Booking(user_id=uid, airline_id=airline_id, pnr_code=pnr_code, source=source)
-    session.add(booking)
-    await session.flush()
-    return booking
+    return result.scalar_one()
 
 
 async def upsert_flight_async(
@@ -273,6 +273,21 @@ async def upsert_flight_async(
     gate: Optional[str] = None,
     terminal: Optional[str] = None,
 ) -> Flight:
+    await session.execute(
+        pg_insert(Flight)
+        .values(
+            booking_id=booking_id,
+            airline_id=airline_id,
+            departure_airport=dep_airport_id,
+            arrival_airport=arr_airport_id,
+            flight_number=flight_number,
+            departure_time=departure_time,
+            arrival_time=arrival_time,
+            gate=gate,
+            terminal=terminal,
+        )
+        .on_conflict_do_nothing(constraint="uq_flights_booking_flight_dep")
+    )
     result = await session.execute(
         select(Flight).where(
             Flight.booking_id == booking_id,
@@ -281,23 +296,7 @@ async def upsert_flight_async(
             Flight.departure_time == departure_time,
         )
     )
-    existing = result.scalar_one_or_none()
-    if existing:
-        return existing
-    flight = Flight(
-        booking_id=booking_id,
-        airline_id=airline_id,
-        departure_airport=dep_airport_id,
-        arrival_airport=arr_airport_id,
-        flight_number=flight_number,
-        departure_time=departure_time,
-        arrival_time=arrival_time,
-        gate=gate,
-        terminal=terminal,
-    )
-    session.add(flight)
-    await session.flush()
-    return flight
+    return result.scalar_one()
 
 
 async def upsert_passenger_async(
@@ -307,6 +306,11 @@ async def upsert_passenger_async(
     last_name: Optional[str],
 ) -> Passenger:
     fn, ln = (first_name or "").strip(), (last_name or "").strip()
+    await session.execute(
+        pg_insert(Passenger)
+        .values(booking_id=booking_id, first_name=fn, last_name=ln)
+        .on_conflict_do_nothing(constraint="uq_passengers_booking_name")
+    )
     result = await session.execute(
         select(Passenger).where(
             Passenger.booking_id == booking_id,
@@ -314,13 +318,7 @@ async def upsert_passenger_async(
             Passenger.last_name == ln,
         )
     )
-    existing = result.scalar_one_or_none()
-    if existing:
-        return existing
-    passenger = Passenger(booking_id=booking_id, first_name=fn, last_name=ln)
-    session.add(passenger)
-    await session.flush()
-    return passenger
+    return result.scalar_one()
 
 
 async def upsert_boarding_pass_async(
@@ -333,27 +331,35 @@ async def upsert_boarding_pass_async(
     boarding_group: Optional[str] = None,
     source: Optional[str] = None,
 ) -> BoardingPass:
-    result = await session.execute(
-        select(BoardingPass).where(
-            BoardingPass.flight_id == flight_id,
-            BoardingPass.passenger_id == passenger_id,
+    # Conflict on barcode (globally unique) with UPDATE so that if a re-upload
+    # produces a different flight_id (due to departure_time drift), the boarding
+    # pass is re-linked to the current flight rather than causing an IntegrityError.
+    await session.execute(
+        pg_insert(BoardingPass)
+        .values(
+            flight_id=flight_id,
+            passenger_id=passenger_id,
+            barcode=barcode,
+            seat_number=seat_number,
+            cabin_class=cabin_class,
+            boarding_group=boarding_group,
+            source=source,
+        )
+        .on_conflict_do_update(
+            constraint="uq_boarding_passes_barcode",
+            set_=dict(
+                flight_id=flight_id,
+                passenger_id=passenger_id,
+                seat_number=seat_number,
+                cabin_class=cabin_class,
+                boarding_group=boarding_group,
+            ),
         )
     )
-    existing = result.scalar_one_or_none()
-    if existing:
-        return existing
-    bp = BoardingPass(
-        flight_id=flight_id,
-        passenger_id=passenger_id,
-        barcode=barcode,
-        seat_number=seat_number,
-        cabin_class=cabin_class,
-        boarding_group=boarding_group,
-        source=source,
+    result = await session.execute(
+        select(BoardingPass).where(BoardingPass.barcode == barcode)
     )
-    session.add(bp)
-    await session.flush()
-    return bp
+    return result.scalar_one()
 
 
 async def update_booking_metadata_async(

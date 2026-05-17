@@ -13,6 +13,7 @@ SOURCE_URL = "https://raw.githubusercontent.com/npow/airline-codes/refs/heads/ma
 
 DUPLICATE_ICAO_CODES = set()
 
+
 def _transform(row: dict) -> dict | None:
     iata = row.get("iata", "").strip()
     icao = row.get("icao", "").strip()
@@ -23,13 +24,13 @@ def _transform(row: dict) -> dict | None:
     DUPLICATE_ICAO_CODES.add(iata)
     return {
         # "id":        int(row["id"]),
-        "name":      name,
-        "alias":     row.get("alias", "").strip() or None,
+        "name": name,
+        "alias": row.get("alias", "").strip() or None,
         "iata_code": iata,
         "icao_code": icao,
-        "callsign":  row.get("callsign", "").strip() or None,
-        "country":   row.get("country", "").strip() or None,
-        "active":    active,
+        "callsign": row.get("callsign", "").strip() or None,
+        "country": row.get("country", "").strip() or None,
+        "active": active,
     }
 
 
@@ -37,7 +38,17 @@ def seed() -> None:
     print(f"Fetching {SOURCE_URL} …")
     resp = httpx.get(SOURCE_URL, follow_redirects=True, timeout=30)
     resp.raise_for_status()
-    raw: list[dict] = resp.json()
+    raw: list[dict] = [
+        *resp.json(),
+        {
+            "name": "Akasa Air",
+            "iata_code": "QP",
+            "icao_code": "AKJ",
+            "callsign": "AKASA AIR",
+            "country": "India",
+            "active": True,
+        },
+    ]
 
     rows = [r for row in raw if (r := _transform(row)) is not None]
     print(f"  {len(raw)} records fetched, {len(rows)} valid (non-empty IATA)")
@@ -49,12 +60,12 @@ def seed() -> None:
             .on_conflict_do_update(
                 index_elements=["icao_code"],
                 set_={
-                    "name":      pg_insert(Airline).excluded.name,
-                    "alias":     pg_insert(Airline).excluded.alias,
+                    "name": pg_insert(Airline).excluded.name,
+                    "alias": pg_insert(Airline).excluded.alias,
                     "icao_code": pg_insert(Airline).excluded.icao_code,
-                    "callsign":  pg_insert(Airline).excluded.callsign,
-                    "country":   pg_insert(Airline).excluded.country,
-                    "active":    pg_insert(Airline).excluded.active,
+                    "callsign": pg_insert(Airline).excluded.callsign,
+                    "country": pg_insert(Airline).excluded.country,
+                    "active": pg_insert(Airline).excluded.active,
                 },
             )
         )
